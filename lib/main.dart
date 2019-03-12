@@ -1,65 +1,108 @@
+import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_github_bloc/bloc/blocs.dart';
+import 'package:flutter_github_bloc/repositories/github_api_client.dart';
+import 'package:flutter_github_bloc/repositories/github_repository.dart';
+import 'package:flutter_github_bloc/widgets/repository_widget.dart';
+import 'package:http/http.dart' as http;
 
-void main() => runApp(MyApp());
+class SimpleBlocDelegate extends BlocDelegate {
+  @override
+  void onTransition(Transition transition) {
+    print(transition);
+  }
+}
 
-class MyApp extends StatelessWidget {
+void main() {
+  BlocSupervisor().delegate = SimpleBlocDelegate();
+
+  final GithubRepository githubRepository = GithubRepository(
+      githubApiClient: GithubApiClient(httpClient: http.Client()));
+
+  runApp(App(githubRepository: githubRepository));
+}
+
+class App extends StatelessWidget {
+  final GithubRepository githubRepository;
+
+  App({Key key, @required this.githubRepository})
+      : assert(githubRepository != null),
+        super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+      title: 'Github Repositories',
+      home: RepositoriesList(
+        githubRepository: githubRepository,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+class RepositoriesList extends StatefulWidget {
+  final GithubRepository githubRepository;
 
-  final String title;
+  RepositoriesList({Key key, @required this.githubRepository})
+      : assert(githubRepository != null),
+        super(key: key);
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  State<RepositoriesList> createState() => _RepositoriesListState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _RepositoriesListState extends State<RepositoriesList> {
+  RepositoriesBloc _repositoriesBloc;
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _repositoriesBloc =
+        RepositoriesBloc(githubRepository: widget.githubRepository);
+    _repositoriesBloc.dispatch(FetchRepositories());
   }
 
   @override
   Widget build(BuildContext context) {
-  
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text('Github Repositories'),
       ),
       body: Center(
-      
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.display1,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
+        child: BlocBuilder(
+            bloc: _repositoriesBloc,
+            builder: (_, RepositoriesState state) {
+              if (state is RepositoriesEmpty) {
+                return Center(
+                    child: Text('There is no repository to show. :('));
+              }
+              if (state is RepositoriesLoading) {
+                return Center(child: CircularProgressIndicator());
+              }
+              if (state is RepositoriesLoaded) {
+                final repositories = state.repositories;
+
+                return ListView.builder(
+                  itemCount: repositories.length,
+                  itemBuilder: (context, index) =>
+                      RepositoryWidget(repositories[index]),
+                );
+              }
+              if (state is RepositoriesError) {
+                return Text(
+                  'Something went wrong!',
+                  style: TextStyle(color: Colors.red),
+                );
+              }
+            }),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _repositoriesBloc.dispose();
+    super.dispose();
   }
 }

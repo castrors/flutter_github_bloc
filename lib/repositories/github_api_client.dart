@@ -17,7 +17,7 @@ class GithubApiClient {
       throw Exception('error getting repositories');
     }
 
-    final repositoriesJson = jsonDecode(repositoriesResponse.body)['items'] as List;
-    return repositoriesJson.map((repositoryJson) => Repository.fromJson(repositoryJson));
+    final data = json.decode(repositoriesResponse.body)['items'] as List;
+    return data.map((rawRepository) => Repository.fromJson(rawRepository)).toList();
   }
 }

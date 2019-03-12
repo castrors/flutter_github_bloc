@@ -23,7 +23,7 @@ class RepositoriesBloc extends Bloc<RepositoriesEvent, RepositoriesState> {
       yield RepositoriesLoading();
       try {
         final List<Repository> repositories = await githubRepository.getRepositories();
-        yield RepositoriesLoaded(repositories: repositories);
+        yield RepositoriesLoaded(repositories: repositories, hasReachedMax: false);
       } catch (_) {
         yield RepositoriesError();
       }
