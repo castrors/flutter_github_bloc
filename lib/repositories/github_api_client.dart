@@ -10,9 +10,12 @@ class GithubApiClient {
 
   GithubApiClient({@required this.httpClient}) :assert(httpClient !=null);
 
-  Future<List<Repository>> getRepositories () async {
-    final repositoriesResponse =await this.httpClient.get(baseUrl);
+  int _currentPage = 0;
 
+  Future<List<Repository>> getRepositories () async {
+    final page = '&page=${_currentPage++}';
+    final repositoriesResponse =await this.httpClient.get(baseUrl+page);
+    
     if(repositoriesResponse.statusCode != 200){
       throw Exception('error getting repositories');
     }

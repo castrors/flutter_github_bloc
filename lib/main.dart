@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_github_bloc/bloc/blocs.dart';
 import 'package:flutter_github_bloc/repositories/github_api_client.dart';
 import 'package:flutter_github_bloc/repositories/github_repository.dart';
+import 'package:flutter_github_bloc/widgets/bottom_loader.dart';
 import 'package:flutter_github_bloc/widgets/repository_widget.dart';
 import 'package:http/http.dart' as http;
 
@@ -16,50 +17,35 @@ class SimpleBlocDelegate extends BlocDelegate {
 
 void main() {
   BlocSupervisor().delegate = SimpleBlocDelegate();
-
-  final GithubRepository githubRepository = GithubRepository(
-      githubApiClient: GithubApiClient(httpClient: http.Client()));
-
-  runApp(App(githubRepository: githubRepository));
+  runApp(App());
 }
 
 class App extends StatelessWidget {
-  final GithubRepository githubRepository;
-
-  App({Key key, @required this.githubRepository})
-      : assert(githubRepository != null),
-        super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Github Repositories',
-      home: RepositoriesList(
-        githubRepository: githubRepository,
-      ),
+      home: RepositoriesList(),
     );
   }
 }
 
 class RepositoriesList extends StatefulWidget {
-  final GithubRepository githubRepository;
-
-  RepositoriesList({Key key, @required this.githubRepository})
-      : assert(githubRepository != null),
-        super(key: key);
 
   @override
   State<RepositoriesList> createState() => _RepositoriesListState();
 }
 
 class _RepositoriesListState extends State<RepositoriesList> {
-  RepositoriesBloc _repositoriesBloc;
+  
+  final RepositoriesBloc _repositoriesBloc = RepositoriesBloc(githubRepository: GithubRepository(
+      githubApiClient: GithubApiClient(httpClient: http.Client())));
+  final _scrollController = ScrollController();
+  final _scrollThreshold = 200.0;
 
-  @override
-  void initState() {
-    super.initState();
-    _repositoriesBloc =
-        RepositoriesBloc(githubRepository: widget.githubRepository);
+  _RepositoriesListState() {
+    _scrollController.addListener(_onScroll);
     _repositoriesBloc.dispatch(FetchRepositories());
   }
 
@@ -74,25 +60,30 @@ class _RepositoriesListState extends State<RepositoriesList> {
             bloc: _repositoriesBloc,
             builder: (_, RepositoriesState state) {
               if (state is RepositoriesEmpty) {
-                return Center(
-                    child: Text('There is no repository to show. :('));
-              }
-              if (state is RepositoriesLoading) {
                 return Center(child: CircularProgressIndicator());
-              }
-              if (state is RepositoriesLoaded) {
-                final repositories = state.repositories;
-
-                return ListView.builder(
-                  itemCount: repositories.length,
-                  itemBuilder: (context, index) =>
-                      RepositoryWidget(repositories[index]),
-                );
               }
               if (state is RepositoriesError) {
                 return Text(
                   'Something went wrong!',
                   style: TextStyle(color: Colors.red),
+                );
+              }
+              if (state is RepositoriesLoaded) {
+                if (state.repositories.isEmpty) {
+                  return Center(
+                    child: Text('no post'),
+                  );
+                }
+                return ListView.builder(
+                  itemBuilder: (context, index) {
+                    return index >= state.repositories.length
+                        ? BottomLoader()
+                        : RepositoryWidget(state.repositories[index]);
+                  },
+                  itemCount: state.hasReachedMax
+                      ? state.repositories.length
+                      : state.repositories.length + 1,
+                  controller: _scrollController,
                 );
               }
             }),
@@ -104,5 +95,13 @@ class _RepositoriesListState extends State<RepositoriesList> {
   void dispose() {
     _repositoriesBloc.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= _scrollThreshold) {
+      _repositoriesBloc.dispatch(FetchRepositories());
+    }
   }
 }

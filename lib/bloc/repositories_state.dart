@@ -25,6 +25,10 @@ class RepositoriesLoaded extends RepositoriesState {
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
     );
   }
+
+  @override
+  String toString() =>
+      'RepositoriesLoaded { repositories: ${repositories.length}, hasReachedMax: $hasReachedMax }';
 }
 
 class RepositoriesError extends RepositoriesState {}
